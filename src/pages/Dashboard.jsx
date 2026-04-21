@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [remaining, setRemaining] = useState(null);     // current remaining score
   const [checkout, setCheckout] = useState(null);        // checkout for current remaining
   const [dartsThisVisit, setDartsThisVisit] = useState(0); // how many darts thrown this visit (0–3)
+  const [visitStartScore, setVisitStartScore] = useState(null); // score at start of current visit
   const [log, setLog] = useState([]);
   const [manualInput, setManualInput] = useState("");
   const logIdRef = useRef(0);
@@ -29,6 +30,7 @@ export default function Dashboard() {
     setRemaining(score);
     setCheckout(co);
     setDartsThisVisit(0);
+    setVisitStartScore(score);
     setLog([{ id: nextId(), type: "set", score }]);
     if (co) speakCheckout(co);
     else speakText(`${score}. No direct checkout available.`);
@@ -81,20 +83,55 @@ export default function Dashboard() {
 
     setRemaining(newRemaining);
     setCheckout(co);
-    setDartsThisVisit(newDartsUsed >= 3 ? 0 : newDartsUsed); // reset visit count after 3 darts
+    const resetVisit = newDartsUsed >= 3;
+    setDartsThisVisit(resetVisit ? 0 : newDartsUsed);
+    if (resetVisit) setVisitStartScore(newRemaining); // new visit starts
     setLog(prev => [...prev, {
       id: nextId(), type: "dart", dartLabel, dartValue,
       dartsUsed: newDartsUsed, remaining: newRemaining, checkout: co
     }]);
   }
 
+  function handleBust() {
+    // Revert to score at start of this visit, reset darts counter
+    const revertTo = visitStartScore ?? remaining;
+    const co = getCheckout(revertTo);
+    speakText(`Bust! Back to ${revertTo}.`);
+    setRemaining(revertTo);
+    setCheckout(co);
+    setDartsThisVisit(0);
+    setVisitStartScore(revertTo);
+    setLog(prev => [...prev, { id: nextId(), type: "bust", remaining: revertTo }]);
+  }
+
+  function handleMiss() {
+    // Score unchanged, dart used up
+    const newDartsUsed = dartsThisVisit + 1;
+    const dartsLeft = 3 - newDartsUsed;
+    const co = getCheckout(remaining);
+    if (newDartsUsed >= 3) {
+      speakText(`Miss. ${remaining} remaining. End of visit.`);
+      setDartsThisVisit(0);
+      setVisitStartScore(remaining);
+    } else {
+      speakText(`Miss. ${remaining} remaining. ${dartsLeft} dart${dartsLeft > 1 ? "s" : ""} left.`);
+      setDartsThisVisit(newDartsUsed);
+    }
+    setCheckout(co);
+    setLog(prev => [...prev, { id: nextId(), type: "miss", dartLabel: "Miss", dartValue: 0, dartsUsed: newDartsUsed, remaining }]);
+  }
+
   // Called by VoiceControl with raw transcript
   const handleVoiceInput = useCallback((text) => {
+    const t = text.toLowerCase().trim();
     if (!gameActive) {
       // Try to extract a starting score
       const score = parseScore(text);
       if (score && score >= 2 && score <= 501) startGame(score);
     } else {
+      // Check for explicit bust/miss commands first
+      if (/\bbust(ed)?\b/.test(t)) { handleBust(); return; }
+      if (/\bmiss(ed)?\b/.test(t)) { handleMiss(); return; }
       // Try to parse a dart throw first
       const dart = parseDartThrow(text);
       if (dart) {
@@ -105,7 +142,7 @@ export default function Dashboard() {
         if (score && score >= 2 && score <= 501) startGame(score);
       }
     }
-  }, [gameActive, remaining, dartsThisVisit]); // eslint-disable-line
+  }, [gameActive, remaining, dartsThisVisit, visitStartScore]); // eslint-disable-line
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
@@ -146,6 +183,7 @@ export default function Dashboard() {
     setRemaining(null);
     setCheckout(null);
     setDartsThisVisit(0);
+    setVisitStartScore(null);
     setLog([]);
     setManualInput("");
   }
