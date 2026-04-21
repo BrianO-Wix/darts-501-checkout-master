@@ -9,11 +9,11 @@ export default function VoiceControl({ onTranscript, prompt }) {
   const [supported, setSupported] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const recognitionRef = useRef(null);
-  const onScoreRef = useRef(onTranscript);
+  const isListeningRef = useRef(false);
+  const onTranscriptRef = useRef(onTranscript);
 
-  // Keep ref in sync so the recognition handler always calls the latest version
   useEffect(() => {
-    onScoreRef.current = onTranscript;
+    onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function VoiceControl({ onTranscript, prompt }) {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = "en-US";
 
@@ -32,59 +32,55 @@ export default function VoiceControl({ onTranscript, prompt }) {
       const current = event.results[event.results.length - 1];
       const text = current[0].transcript;
       setTranscript(text);
-
       if (current.isFinal) {
-        onScoreRef.current(text);
+        setTranscript("");
+        onTranscriptRef.current(text);
       }
     };
 
     recognition.onerror = (event) => {
-      setIsListening(false);
       if (event.error === "not-allowed") {
         setErrorMsg("Microphone access denied. Please allow microphone in your browser.");
-      } else if (event.error === "no-speech") {
-        setErrorMsg("No speech detected. Try again.");
-      } else {
-        setErrorMsg(`Error: ${event.error}`);
+        isListeningRef.current = false;
+        setIsListening(false);
       }
+      // Ignore "no-speech" and other non-fatal errors — continuous mode will keep going
     };
 
     recognition.onend = () => {
-      setIsListening(false);
+      // Auto-restart if we're still supposed to be listening
+      if (isListeningRef.current) {
+        try { recognition.start(); } catch (_) {}
+      } else {
+        setIsListening(false);
+      }
     };
 
     recognitionRef.current = recognition;
-
-    return () => {
-      recognition.abort();
-    };
-  }, []); // Only run once — uses ref for callback
+    return () => { recognition.abort(); };
+  }, []);
 
   const toggleListening = useCallback(async () => {
     if (!recognitionRef.current) return;
     setErrorMsg("");
 
-    if (isListening) {
+    if (isListeningRef.current) {
+      isListeningRef.current = false;
       recognitionRef.current.stop();
       setIsListening(false);
     } else {
-      // Request microphone permission explicitly first
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (err) {
+      } catch (_) {
         setErrorMsg("Microphone access denied. Please allow microphone in your browser.");
         return;
       }
-
+      isListeningRef.current = true;
+      setIsListening(true);
       setTranscript("");
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (err) {
-        setErrorMsg("Could not start voice recognition. Try again.");
-      }
+      try { recognitionRef.current.start(); } catch (_) {}
     }
-  }, [isListening]);
+  }, []);
 
   if (!supported) {
     return (
@@ -149,9 +145,9 @@ export default function VoiceControl({ onTranscript, prompt }) {
 
       {/* Status label */}
       <p className="text-sm font-body text-muted-foreground tracking-wide uppercase">
-        {isListening ? "Listening…" : "Tap to speak"}
+        {isListening ? "Live — mic is on" : "Mic is off"}
       </p>
-      {prompt && !isListening && (
+      {prompt && (
         <p className="text-xs font-body text-muted-foreground/70 text-center max-w-xs">{prompt}</p>
       )}
 
