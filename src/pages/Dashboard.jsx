@@ -95,10 +95,12 @@ export default function Dashboard() {
 
   // Called by VoiceControl with raw transcript
   const handleVoiceInput = useCallback((text) => {
+    // Ignore input while TTS is speaking (prevents recognising own voice output)
+    if (window.speechSynthesis?.speaking) return;
+
     const trimmed = text.trim();
     if (trimmed === lastTranscriptRef.current) return; // ignore duplicate recognition events
     lastTranscriptRef.current = trimmed;
-    // Clear the dedup ref after 2s so the same phrase can be said again
     setTimeout(() => { lastTranscriptRef.current = ""; }, 2000);
 
     const t = trimmed.toLowerCase();
