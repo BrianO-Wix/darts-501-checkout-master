@@ -191,6 +191,19 @@ export default function Dashboard() {
                 </form>
               </div>
 
+              {/* New Game button — visible during active game */}
+              {gameActive && (
+                <div className="flex justify-end">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={resetGame}
+                    className="px-4 py-2 rounded-lg font-body text-sm font-semibold border border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                  >
+                    End Match
+                  </motion.button>
+                </div>
+              )}
+
               {/* Current checkout */}
               <div className="bg-card rounded-2xl border border-border p-6">
                 {gameActive && remaining > 0 && (
