@@ -1,0 +1,31 @@
+{
+  "name": "GameStats",
+  "type": "object",
+  "properties": {
+    "checkout_attempts": {
+      "type": "number",
+      "description": "Total number of times player was on a checkout score (\u2264170)"
+    },
+    "checkout_successes": {
+      "type": "number",
+      "description": "Total number of successful checkouts"
+    },
+    "games_played": {
+      "type": "number",
+      "description": "Total games played"
+    },
+    "games_won": {
+      "type": "number",
+      "description": "Total games finished (checked out)"
+    },
+    "highest_checkout": {
+      "type": "number",
+      "description": "Highest score checked out from"
+    },
+    "total_darts": {
+      "type": "number",
+      "description": "Total darts thrown across all games"
+    }
+  },
+  "required": []
+}

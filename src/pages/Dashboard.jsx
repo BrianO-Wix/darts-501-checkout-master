@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Target, List, Undo2 } from "lucide-react";
+import { Target, List, Undo2, BarChart2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { getCheckout } from "@/lib/checkouts";
 import { parseDartThrow, parseScore } from "@/lib/dartParser";
@@ -9,6 +9,8 @@ import VoiceControl, { speakCheckout, speakText } from "@/components/darts/Voice
 import CheckoutDisplay from "@/components/darts/CheckoutDisplay";
 import CheckoutTable from "@/components/darts/CheckoutTable";
 import GameLog from "@/components/darts/GameLog";
+import StatsPanel from "@/components/darts/StatsPanel";
+import { base44 } from "@/api/base44Client";
 
 export default function Dashboard() {
   // Game state
@@ -36,6 +38,36 @@ export default function Dashboard() {
 
   const nextId = () => ++logIdRef.current;
 
+  // Track checkout attempt whenever player is on a finishing score (≤170) and throws
+  async function recordStat({ attempt, success, dartsUsed, fromScore }) {
+    try {
+      const authed = await base44.auth.isAuthenticated();
+      if (!authed) return;
+      const me = await base44.auth.me();
+      const records = await base44.entities.GameStats.filter({ created_by: me.email });
+      const existing = records[0];
+      if (existing) {
+        await base44.entities.GameStats.update(existing.id, {
+          checkout_attempts: (existing.checkout_attempts || 0) + (attempt ? 1 : 0),
+          checkout_successes: (existing.checkout_successes || 0) + (success ? 1 : 0),
+          games_played: success ? (existing.games_played || 0) + 1 : existing.games_played || 0,
+          games_won: success ? (existing.games_won || 0) + 1 : existing.games_won || 0,
+          highest_checkout: success ? Math.max(existing.highest_checkout || 0, fromScore) : existing.highest_checkout || 0,
+          total_darts: (existing.total_darts || 0) + (dartsUsed || 0),
+        });
+      } else {
+        await base44.entities.GameStats.create({
+          checkout_attempts: attempt ? 1 : 0,
+          checkout_successes: success ? 1 : 0,
+          games_played: success ? 1 : 0,
+          games_won: success ? 1 : 0,
+          highest_checkout: success ? fromScore : 0,
+          total_darts: dartsUsed || 0,
+        });
+      }
+    } catch (_) {}
+  }
+
   // Mode: if no game started yet, voice sets the score. Otherwise, voice interprets dart throws.
   const gameActive = remaining !== null;
 
@@ -57,6 +89,7 @@ export default function Dashboard() {
     // Bust or invalid
     if (newRemaining < 0 || newRemaining === 1) {
       speakText("Bust!");
+      if (remaining <= 170) recordStat({ attempt: true, success: false, dartsUsed: newDartsUsed, fromScore: remaining });
       setLog(prev => [...prev, { id: nextId(), type: "dart", dartLabel, dartValue, dartsUsed: newDartsUsed, remaining, bust: true }]);
       setDartsThisVisit(newDartsUsed);
       return;
@@ -73,6 +106,7 @@ export default function Dashboard() {
       }
       speakText("Checkout! Game of Darts! Well done!");
       setLog(prev => [...prev, { id: nextId(), type: "dart", dartLabel, dartValue, dartsUsed: newDartsUsed, remaining: 0, checkout: null, finished: true }]);
+      recordStat({ attempt: true, success: true, dartsUsed: newDartsUsed, fromScore: remaining });
       setRemaining(0);
       setCheckout(null);
       return;
@@ -227,7 +261,7 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="max-w-2xl mx-auto px-4 py-8">
         <Tabs defaultValue="voice" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-secondary mb-8">
+          <TabsList className="grid w-full grid-cols-3 bg-secondary mb-8">
             <TabsTrigger value="voice" className="font-body gap-2">
               <Target className="w-4 h-4" />
               Live Game
@@ -235,6 +269,10 @@ export default function Dashboard() {
             <TabsTrigger value="table" className="font-body gap-2">
               <List className="w-4 h-4" />
               All Checkouts
+            </TabsTrigger>
+            <TabsTrigger value="stats" className="font-body gap-2">
+              <BarChart2 className="w-4 h-4" />
+              My Stats
             </TabsTrigger>
           </TabsList>
 
@@ -323,6 +361,13 @@ export default function Dashboard() {
           <TabsContent value="table">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <CheckoutTable />
+            </motion.div>
+          </TabsContent>
+
+          {/* Stats Tab */}
+          <TabsContent value="stats">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+              <StatsPanel />
             </motion.div>
           </TabsContent>
         </Tabs>
