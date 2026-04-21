@@ -183,13 +183,43 @@ export default function VoiceControl({ onTranscript, prompt }) {
   );
 }
 
+function getBritishMaleVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  // Priority: UK English male voices
+  const preferred = [
+    "Google UK English Male",
+    "Microsoft George",
+    "Microsoft George - English (United Kingdom)",
+    "Daniel", // macOS British male
+  ];
+  for (const name of preferred) {
+    const v = voices.find(v => v.name === name);
+    if (v) return v;
+  }
+  // Fallback: any en-GB voice
+  return voices.find(v => v.lang === "en-GB") || null;
+}
+
 export function speakText(text) {
   if (!text || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.9;
-  utterance.pitch = 1;
-  utterance.lang = "en-US";
+  utterance.lang = "en-GB";
+  utterance.rate = 0.82;   // slower = more authoritative
+  utterance.pitch = 0.7;   // lower = gruff
+  utterance.volume = 1;
+
+  // Voices may not be loaded yet — wait if needed
+  const voice = getBritishMaleVoice();
+  if (voice) {
+    utterance.voice = voice;
+  } else {
+    window.speechSynthesis.onvoiceschanged = () => {
+      const v = getBritishMaleVoice();
+      if (v) utterance.voice = v;
+    };
+  }
+
   window.speechSynthesis.speak(utterance);
 }
 
