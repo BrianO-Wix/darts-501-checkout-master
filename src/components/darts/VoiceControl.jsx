@@ -84,15 +84,40 @@ const VoiceControl = forwardRef(function VoiceControl({ onTranscript, prompt }, 
 
   useImperativeHandle(ref, () => ({ toggle: toggleListening }), [toggleListening]);
 
-  // Register MediaSession so AirPods play/pause tap toggles the mic
+  // Play a silent audio loop so MediaSession claims the hardware media button
+  // away from Apple Music / Spotify, then wire up play/pause to toggle the mic.
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
-    navigator.mediaSession.metadata = new MediaMetadata({ title: "Darts Checkout Pro", artist: "Mic control" });
+
+    // Create a near-silent audio loop via the Web Audio API
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = 0.001; // effectively silent
+    gainNode.connect(ctx.destination);
+
+    // Oscillator keeps the audio context "active" so MediaSession stays ours
+    const osc = ctx.createOscillator();
+    osc.connect(gainNode);
+    osc.start();
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: "Darts Checkout Pro",
+      artist: "Tap to toggle mic",
+    });
+    navigator.mediaSession.playbackState = "playing";
+
     navigator.mediaSession.setActionHandler("play", () => toggleListening());
     navigator.mediaSession.setActionHandler("pause", () => toggleListening());
+    navigator.mediaSession.setActionHandler("stop", () => {
+      if (isListeningRef.current) toggleListening();
+    });
+
     return () => {
       navigator.mediaSession.setActionHandler("play", null);
       navigator.mediaSession.setActionHandler("pause", null);
+      navigator.mediaSession.setActionHandler("stop", null);
+      osc.stop();
+      ctx.close();
     };
   }, [toggleListening]);
 
