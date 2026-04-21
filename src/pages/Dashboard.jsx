@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Target, List } from "lucide-react";
+import { Target, List, Undo2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { getCheckout } from "@/lib/checkouts";
 import { parseDartThrow, parseScore } from "@/lib/dartParser";
@@ -124,6 +124,24 @@ export default function Dashboard() {
     }
   };
 
+  function undoLast() {
+    if (log.length <= 1) return; // can't undo the initial "set" entry
+    const newLog = log.slice(0, -1);
+    const prev = newLog[newLog.length - 1];
+    // Restore remaining from the previous log entry
+    const prevRemaining = prev.type === "set" ? prev.score : prev.remaining;
+    const prevBust = prev.bust;
+    // Recalculate darts this visit: count dart entries after the last "set"
+    const sinceSet = newLog.filter(e => e.type === "dart" && !e.bust);
+    const dartsCount = sinceSet.length % 3;
+    const newRemaining = prevBust ? remaining : prevRemaining;
+    const co = getCheckout(newRemaining);
+    setLog(newLog);
+    setRemaining(newRemaining);
+    setCheckout(co);
+    setDartsThisVisit(dartsCount);
+  }
+
   function resetGame() {
     setRemaining(null);
     setCheckout(null);
@@ -198,9 +216,18 @@ export default function Dashboard() {
                 </form>
               </div>
 
-              {/* New Game button — visible during active game */}
+              {/* Game action buttons */}
               {gameActive && (
-                <div className="flex justify-end">
+                <div className="flex justify-between items-center">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={undoLast}
+                    disabled={log.length <= 1}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-body text-sm font-semibold border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                  >
+                    <Undo2 className="w-4 h-4" />
+                    Undo Last
+                  </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={resetGame}
