@@ -1,36 +1,132 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Target, List } from "lucide-react";
 import { motion } from "framer-motion";
 import { getCheckout } from "@/lib/checkouts";
-import VoiceControl, { speakCheckout } from "@/components/darts/VoiceControl";
+import { parseDartThrow, parseScore } from "@/lib/dartParser";
+import VoiceControl, { speakCheckout, speakText } from "@/components/darts/VoiceControl";
 import CheckoutDisplay from "@/components/darts/CheckoutDisplay";
 import CheckoutTable from "@/components/darts/CheckoutTable";
+import GameLog from "@/components/darts/GameLog";
 
 export default function Dashboard() {
-  const [score, setScore] = useState(null);
-  const [checkout, setCheckout] = useState(null);
+  // Game state
+  const [remaining, setRemaining] = useState(null);     // current remaining score
+  const [checkout, setCheckout] = useState(null);        // checkout for current remaining
+  const [dartsThisVisit, setDartsThisVisit] = useState(0); // how many darts thrown this visit (0–3)
+  const [log, setLog] = useState([]);
   const [manualInput, setManualInput] = useState("");
+  const logIdRef = useRef(0);
 
-  const handleScore = useCallback((value) => {
-    setScore(value);
-    const result = getCheckout(value);
-    setCheckout(result);
+  const nextId = () => ++logIdRef.current;
 
-    // Auto-speak the result
-    if (result) {
-      speakCheckout(result);
+  // Mode: if no game started yet, voice sets the score. Otherwise, voice interprets dart throws.
+  const gameActive = remaining !== null;
+
+  function startGame(score) {
+    const co = getCheckout(score);
+    setRemaining(score);
+    setCheckout(co);
+    setDartsThisVisit(0);
+    setLog([{ id: nextId(), type: "set", score }]);
+    if (co) speakCheckout(co);
+    else speakText(`${score}. No direct checkout available.`);
+  }
+
+  function throwDart(dartLabel, dartValue) {
+    const newDartsUsed = dartsThisVisit + 1;
+    const newRemaining = remaining - dartValue;
+
+    // Bust or invalid
+    if (newRemaining < 0 || newRemaining === 1) {
+      speakText("Bust!");
+      setLog(prev => [...prev, { id: nextId(), type: "dart", dartLabel, dartValue, dartsUsed: newDartsUsed, remaining, bust: true }]);
+      setDartsThisVisit(newDartsUsed);
+      return;
     }
-  }, []);
+
+    // Checkout!
+    if (newRemaining === 0) {
+      speakText("Checkout! Well done!");
+      setLog(prev => [...prev, { id: nextId(), type: "dart", dartLabel, dartValue, dartsUsed: newDartsUsed, remaining: 0, checkout: null, finished: true }]);
+      setRemaining(0);
+      setCheckout(null);
+      return;
+    }
+
+    const dartsLeft = 3 - newDartsUsed;
+    const co = getCheckout(newRemaining);
+
+    // Check if checkout is achievable with darts left in this visit
+    const achievable = co && co.darts.length <= dartsLeft;
+
+    let spokenResponse = `${newRemaining} remaining.`;
+    if (achievable) {
+      spokenResponse += ` ${co.spoken.join(", ")}`;
+    } else if (dartsLeft > 0 && co) {
+      spokenResponse += ` ${dartsLeft} dart${dartsLeft > 1 ? "s" : ""} left this visit. Best finish: ${co.spoken.join(", ")}`;
+    } else if (dartsLeft === 0) {
+      spokenResponse += " End of visit.";
+    }
+
+    speakText(spokenResponse);
+
+    setRemaining(newRemaining);
+    setCheckout(co);
+    setDartsThisVisit(newDartsUsed >= 3 ? 0 : newDartsUsed); // reset visit count after 3 darts
+    setLog(prev => [...prev, {
+      id: nextId(), type: "dart", dartLabel, dartValue,
+      dartsUsed: newDartsUsed, remaining: newRemaining, checkout: co
+    }]);
+  }
+
+  // Called by VoiceControl with raw transcript
+  const handleVoiceInput = useCallback((text) => {
+    if (!gameActive) {
+      // Try to extract a starting score
+      const score = parseScore(text);
+      if (score && score >= 2 && score <= 501) startGame(score);
+    } else {
+      // Try to parse a dart throw first
+      const dart = parseDartThrow(text);
+      if (dart) {
+        throwDart(dart.label, dart.value);
+      } else {
+        // Maybe they said a bare number meaning a new score
+        const score = parseScore(text);
+        if (score && score >= 2 && score <= 501) startGame(score);
+      }
+    }
+  }, [gameActive, remaining, dartsThisVisit]); // eslint-disable-line
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
-    const num = parseInt(manualInput, 10);
-    if (!isNaN(num) && num > 0) {
-      handleScore(num);
+    const val = manualInput.trim();
+    if (!val) return;
+
+    if (!gameActive) {
+      const n = parseInt(val, 10);
+      if (!isNaN(n) && n >= 2 && n <= 501) { startGame(n); setManualInput(""); }
+    } else {
+      // Try dart parse first
+      const dart = parseDartThrow(val);
+      if (dart) { throwDart(dart.label, dart.value); setManualInput(""); return; }
+      const n = parseInt(val, 10);
+      if (!isNaN(n) && n >= 2 && n <= 501) { startGame(n); setManualInput(""); }
     }
   };
+
+  function resetGame() {
+    setRemaining(null);
+    setCheckout(null);
+    setDartsThisVisit(0);
+    setLog([]);
+    setManualInput("");
+  }
+
+  const dartsLeft = 3 - dartsThisVisit;
+  const achievableNow = checkout && checkout.darts.length <= dartsLeft;
 
   return (
     <div className="min-h-screen bg-background font-body">
@@ -55,7 +151,7 @@ export default function Dashboard() {
           <TabsList className="grid w-full grid-cols-2 bg-secondary mb-8">
             <TabsTrigger value="voice" className="font-body gap-2">
               <Target className="w-4 h-4" />
-              Voice Checkout
+              Live Game
             </TabsTrigger>
             <TabsTrigger value="table" className="font-body gap-2">
               <List className="w-4 h-4" />
@@ -65,51 +161,65 @@ export default function Dashboard() {
 
           {/* Voice Tab */}
           <TabsContent value="voice">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-8"
-            >
-              {/* Voice Input */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+
+              {/* Voice mic */}
               <div className="bg-card rounded-2xl border border-border p-8">
-                <VoiceControl onScoreDetected={handleScore} />
+                <VoiceControl
+                  onTranscript={handleVoiceInput}
+                  prompt={gameActive ? `Say a dart (e.g. "triple 20") or new score` : `Say your remaining score`}
+                />
               </div>
 
-              {/* Manual Input */}
-              <div className="bg-card rounded-2xl border border-border p-6">
+              {/* Manual input */}
+              <div className="bg-card rounded-2xl border border-border p-5">
                 <form onSubmit={handleManualSubmit} className="flex gap-3">
                   <Input
-                    type="number"
-                    min="1"
-                    max="170"
-                    placeholder="Or type your score…"
+                    type="text"
+                    placeholder={gameActive ? `Type a dart or score (e.g. "triple 20" or "116")…` : "Type your remaining score…"}
                     value={manualInput}
                     onChange={(e) => setManualInput(e.target.value)}
-                    className="font-body text-lg bg-secondary border-border"
+                    className="font-body bg-secondary border-border"
                   />
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     type="submit"
-                    className="px-6 py-2 bg-primary text-primary-foreground rounded-lg font-body font-semibold text-sm hover:bg-primary/90 transition-colors"
+                    className="px-6 py-2 bg-primary text-primary-foreground rounded-lg font-body font-semibold text-sm hover:bg-primary/90 transition-colors shrink-0"
                   >
-                    Go
+                    {gameActive ? "Throw" : "Start"}
                   </motion.button>
                 </form>
               </div>
 
-              {/* Checkout Result */}
+              {/* Current checkout */}
               <div className="bg-card rounded-2xl border border-border p-6">
-                <CheckoutDisplay checkout={checkout} score={score} />
+                {gameActive && remaining > 0 && (
+                  <div className="mb-3 flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-body uppercase tracking-widest text-muted-foreground">
+                      Darts left this visit:
+                    </span>
+                    <div className="flex gap-1">
+                      {[1, 2, 3].map(d => (
+                        <span key={d} className={`w-3 h-3 rounded-full ${d <= dartsLeft ? "bg-primary" : "bg-muted"}`} />
+                      ))}
+                    </div>
+                    {!achievableNow && checkout && (
+                      <span className="text-xs text-accent font-body">(needs next visit)</span>
+                    )}
+                  </div>
+                )}
+                <CheckoutDisplay checkout={checkout} score={remaining} />
               </div>
+
+              {/* Log history */}
+              <GameLog log={log} onReset={resetGame} />
+
             </motion.div>
           </TabsContent>
 
           {/* Table Tab */}
           <TabsContent value="table">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <CheckoutTable />
             </motion.div>
           </TabsContent>

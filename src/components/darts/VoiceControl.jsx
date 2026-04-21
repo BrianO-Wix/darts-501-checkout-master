@@ -3,18 +3,18 @@ import { Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function VoiceControl({ onScoreDetected }) {
+export default function VoiceControl({ onTranscript, prompt }) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [supported, setSupported] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const recognitionRef = useRef(null);
-  const onScoreRef = useRef(onScoreDetected);
+  const onScoreRef = useRef(onTranscript);
 
   // Keep ref in sync so the recognition handler always calls the latest version
   useEffect(() => {
-    onScoreRef.current = onScoreDetected;
-  }, [onScoreDetected]);
+    onScoreRef.current = onTranscript;
+  }, [onTranscript]);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -34,12 +34,7 @@ export default function VoiceControl({ onScoreDetected }) {
       setTranscript(text);
 
       if (current.isFinal) {
-        // Try to parse spoken numbers like "one hundred and seventy" or digits "170"
-        const numbers = text.match(/\d+/g);
-        if (numbers) {
-          const score = parseInt(numbers[numbers.length - 1], 10);
-          onScoreRef.current(score);
-        }
+        onScoreRef.current(text);
       }
     };
 
@@ -156,6 +151,9 @@ export default function VoiceControl({ onScoreDetected }) {
       <p className="text-sm font-body text-muted-foreground tracking-wide uppercase">
         {isListening ? "Listening…" : "Tap to speak"}
       </p>
+      {prompt && !isListening && (
+        <p className="text-xs font-body text-muted-foreground/70 text-center max-w-xs">{prompt}</p>
+      )}
 
       {/* Error message */}
       <AnimatePresence>
@@ -189,15 +187,17 @@ export default function VoiceControl({ onScoreDetected }) {
   );
 }
 
-export function speakCheckout(checkout) {
-  if (!checkout || !window.speechSynthesis) return;
-
+export function speakText(text) {
+  if (!text || !window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-
-  const text = checkout.spoken.join(", ");
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.rate = 0.9;
   utterance.pitch = 1;
   utterance.lang = "en-US";
   window.speechSynthesis.speak(utterance);
+}
+
+export function speakCheckout(checkout) {
+  if (!checkout) return;
+  speakText(checkout.spoken.join(", "));
 }

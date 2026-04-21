@@ -37,7 +37,7 @@ export default function CheckoutDisplay({ checkout, score }) {
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={checkout.score}
+        key={score}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
@@ -53,7 +53,7 @@ export default function CheckoutDisplay({ checkout, score }) {
             Remaining
           </p>
           <p className="text-accent font-display text-8xl leading-none tracking-tight">
-            {checkout.score}
+            {score}
           </p>
         </motion.div>
 
