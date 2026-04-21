@@ -92,8 +92,26 @@ export default function Dashboard() {
     }]);
   }
 
+  // Called by VoiceControl with raw transcript
+  const handleVoiceInput = useCallback((text) => {
+    const t = text.toLowerCase().trim();
+    if (!gameActive) {
+      const score = parseScore(text);
+      if (score && score >= 2 && score <= 501) startGame(score);
+    } else {
+      if (/\bbust(ed)?\b/.test(t)) { handleBust(); return; }
+      if (/\bmiss(ed)?\b/.test(t)) { handleMiss(); return; }
+      const dart = parseDartThrow(text);
+      if (dart) {
+        throwDart(dart.label, dart.value);
+      } else {
+        const score = parseScore(text);
+        if (score && score >= 2 && score <= 501) startGame(score);
+      }
+    }
+  }, [gameActive, remaining, dartsThisVisit, visitStartScore]); // eslint-disable-line
+
   function handleBust() {
-    // Revert to score at start of this visit, reset darts counter
     const revertTo = visitStartScore ?? remaining;
     const co = getCheckout(revertTo);
     speakText(`Bust! Back to ${revertTo}.`);
@@ -105,7 +123,6 @@ export default function Dashboard() {
   }
 
   function handleMiss() {
-    // Score unchanged, dart used up
     const newDartsUsed = dartsThisVisit + 1;
     const dartsLeft = 3 - newDartsUsed;
     const co = getCheckout(remaining);
@@ -121,29 +138,6 @@ export default function Dashboard() {
     setLog(prev => [...prev, { id: nextId(), type: "miss", dartLabel: "Miss", dartValue: 0, dartsUsed: newDartsUsed, remaining }]);
   }
 
-  // Called by VoiceControl with raw transcript
-  const handleVoiceInput = useCallback((text) => {
-    const t = text.toLowerCase().trim();
-    if (!gameActive) {
-      // Try to extract a starting score
-      const score = parseScore(text);
-      if (score && score >= 2 && score <= 501) startGame(score);
-    } else {
-      // Check for explicit bust/miss commands first
-      if (/\bbust(ed)?\b/.test(t)) { handleBust(); return; }
-      if (/\bmiss(ed)?\b/.test(t)) { handleMiss(); return; }
-      // Try to parse a dart throw first
-      const dart = parseDartThrow(text);
-      if (dart) {
-        throwDart(dart.label, dart.value);
-      } else {
-        // Maybe they said a bare number meaning a new score
-        const score = parseScore(text);
-        if (score && score >= 2 && score <= 501) startGame(score);
-      }
-    }
-  }, [gameActive, remaining, dartsThisVisit, visitStartScore]); // eslint-disable-line
-
   const handleManualSubmit = (e) => {
     e.preventDefault();
     const val = manualInput.trim();
@@ -153,6 +147,9 @@ export default function Dashboard() {
       const n = parseInt(val, 10);
       if (!isNaN(n) && n >= 2 && n <= 501) { startGame(n); setManualInput(""); }
     } else {
+      const t = val.toLowerCase();
+      if (/\bbust(ed)?\b/.test(t)) { handleBust(); setManualInput(""); return; }
+      if (/\bmiss(ed)?\b/.test(t)) { handleMiss(); setManualInput(""); return; }
       // Try dart parse first
       const dart = parseDartThrow(val);
       if (dart) { throwDart(dart.label, dart.value); setManualInput(""); return; }

@@ -31,7 +31,19 @@ export default function GameLog({ log, onReset }) {
                   : "bg-secondary/40 border-border/50"
               }`}
             >
-              {entry.type === "set" ? (
+              {entry.type === "bust" ? (
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-body text-sm text-destructive font-medium">Bust — reverted</span>
+                  <span className="font-display text-2xl text-accent">{entry.remaining}</span>
+                </div>
+              ) : entry.type === "miss" ? (
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-body text-sm text-muted-foreground">
+                    Miss <span className="text-muted-foreground">· dart {entry.dartsUsed}/3</span>
+                  </span>
+                  <span className="font-display text-2xl text-accent">{entry.remaining}</span>
+                </div>
+              ) : entry.type === "set" ? (
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <span className="font-body text-sm text-muted-foreground">Game started at</span>
                   <span className="font-display text-2xl text-accent">{entry.score}</span>
