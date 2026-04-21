@@ -46,8 +46,15 @@ export default function Dashboard() {
       return;
     }
 
-    // Checkout!
+    // Checkout! Must finish on a double or bullseye
     if (newRemaining === 0) {
+      const isValidFinish = dartLabel.startsWith("Double") || dartLabel === "Bullseye";
+      if (!isValidFinish) {
+        speakText("Bust! Must finish on a double.");
+        setLog(prev => [...prev, { id: nextId(), type: "dart", dartLabel, dartValue, dartsUsed: newDartsUsed, remaining, bust: true }]);
+        setDartsThisVisit(newDartsUsed);
+        return;
+      }
       speakText("Checkout! Game of Darts! Well done!");
       setLog(prev => [...prev, { id: nextId(), type: "dart", dartLabel, dartValue, dartsUsed: newDartsUsed, remaining: 0, checkout: null, finished: true }]);
       setRemaining(0);
