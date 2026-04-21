@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [log, setLog] = useState([]);
   const [manualInput, setManualInput] = useState("");
   const logIdRef = useRef(0);
+  const lastTranscriptRef = useRef("");
 
   const nextId = () => ++logIdRef.current;
 
@@ -94,7 +95,13 @@ export default function Dashboard() {
 
   // Called by VoiceControl with raw transcript
   const handleVoiceInput = useCallback((text) => {
-    const t = text.toLowerCase().trim();
+    const trimmed = text.trim();
+    if (trimmed === lastTranscriptRef.current) return; // ignore duplicate recognition events
+    lastTranscriptRef.current = trimmed;
+    // Clear the dedup ref after 2s so the same phrase can be said again
+    setTimeout(() => { lastTranscriptRef.current = ""; }, 2000);
+
+    const t = trimmed.toLowerCase();
     if (!gameActive) {
       const score = parseScore(text);
       if (score && score >= 2 && score <= 501) startGame(score);
