@@ -117,8 +117,12 @@ export default function Dashboard() {
       if (dart) {
         throwDart(dart.label, dart.value);
       } else {
-        const score = parseScore(text);
-        if (score && score >= 2 && score <= 501) startGame(score);
+        // Only restart/reset score if input looks like a plain number — no dart keywords
+        const hasDartKeyword = /\b(double|triple|single|bull|miss|bust|t\d|d\d|s\d)\b/i.test(text);
+        if (!hasDartKeyword) {
+          const score = parseScore(text);
+          if (score && score >= 2 && score <= 501) startGame(score);
+        }
       }
     }
   }, [gameActive, remaining, dartsThisVisit, visitStartScore]); // eslint-disable-line
@@ -164,8 +168,12 @@ export default function Dashboard() {
       // Try dart parse first
       const dart = parseDartThrow(val);
       if (dart) { throwDart(dart.label, dart.value); setManualInput(""); return; }
-      const n = parseInt(val, 10);
-      if (!isNaN(n) && n >= 2 && n <= 501) { startGame(n); setManualInput(""); }
+      // Only reset score if it looks like a plain number
+      const hasDartKeyword = /\b(double|triple|single|bull|miss|bust|t\d|d\d|s\d)\b/i.test(val);
+      if (!hasDartKeyword) {
+        const n = parseInt(val, 10);
+        if (!isNaN(n) && n >= 2 && n <= 501) { startGame(n); setManualInput(""); }
+      }
     }
   };
 
