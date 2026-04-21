@@ -100,7 +100,7 @@ const VoiceControl = forwardRef(function VoiceControl({ onTranscript, prompt }, 
     source.start();
 
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: "Darts Checkout Pro",
+      title: "ShotCaller",
       artist: "Tap to toggle mic",
     });
     navigator.mediaSession.playbackState = "playing";

@@ -251,7 +251,7 @@ export default function Dashboard() {
           </div>
           <div>
             <h1 className="font-display text-2xl tracking-wide text-foreground leading-none">
-              OutCaller
+              ShotCaller
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">501 Darts Calculator</p>
           </div>
