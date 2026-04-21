@@ -89,16 +89,15 @@ const VoiceControl = forwardRef(function VoiceControl({ onTranscript, prompt }, 
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
 
-    // Create a near-silent audio loop via the Web Audio API
+    // Create a truly silent audio loop to keep MediaSession active
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const gainNode = ctx.createGain();
-    gainNode.gain.value = 0.001; // effectively silent
-    gainNode.connect(ctx.destination);
-
-    // Oscillator keeps the audio context "active" so MediaSession stays ours
-    const osc = ctx.createOscillator();
-    osc.connect(gainNode);
-    osc.start();
+    // 1-frame buffer of silence
+    const buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(ctx.destination);
+    source.start();
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: "Darts Checkout Pro",
@@ -116,7 +115,7 @@ const VoiceControl = forwardRef(function VoiceControl({ onTranscript, prompt }, 
       navigator.mediaSession.setActionHandler("play", null);
       navigator.mediaSession.setActionHandler("pause", null);
       navigator.mediaSession.setActionHandler("stop", null);
-      osc.stop();
+      source.stop();
       ctx.close();
     };
   }, [toggleListening]);
