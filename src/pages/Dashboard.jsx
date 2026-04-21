@@ -48,7 +48,7 @@ export default function Dashboard() {
 
     // Checkout!
     if (newRemaining === 0) {
-      speakText("Checkout! Well done!");
+      speakText("Checkout! Game of Darts! Well done!");
       setLog(prev => [...prev, { id: nextId(), type: "dart", dartLabel, dartValue, dartsUsed: newDartsUsed, remaining: 0, checkout: null, finished: true }]);
       setRemaining(0);
       setCheckout(null);
