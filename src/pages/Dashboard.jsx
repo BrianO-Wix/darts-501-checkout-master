@@ -78,20 +78,10 @@ export default function Dashboard() {
       return;
     }
 
-    const dartsLeft = 3 - newDartsUsed;
     const co = getCheckout(newRemaining);
 
-    // Check if checkout is achievable with darts left in this visit
-    const achievable = co && co.darts.length <= dartsLeft;
-
-    let spokenResponse = `${newRemaining} remaining.`;
-    if (achievable) {
-      spokenResponse += ` ${co.spoken.join(", ")}`;
-    } else if (dartsLeft > 0 && co) {
-      spokenResponse += ` ${dartsLeft} dart${dartsLeft > 1 ? "s" : ""} left this visit. Best finish: ${co.spoken.join(", ")}`;
-    } else if (dartsLeft === 0) {
-      spokenResponse += " End of visit.";
-    }
+    let spokenResponse = `${newRemaining}`;
+    if (co) spokenResponse += `. ${co.spoken.join(", ")}`;
 
     speakText(spokenResponse);
 
@@ -148,12 +138,11 @@ export default function Dashboard() {
     const newDartsUsed = dartsThisVisit + 1;
     const dartsLeft = 3 - newDartsUsed;
     const co = getCheckout(remaining);
+    speakText(`Miss. ${remaining}.`);
     if (newDartsUsed >= 3) {
-      speakText(`Miss. ${remaining} remaining. End of visit.`);
       setDartsThisVisit(0);
       setVisitStartScore(remaining);
     } else {
-      speakText(`Miss. ${remaining} remaining. ${dartsLeft} dart${dartsLeft > 1 ? "s" : ""} left.`);
       setDartsThisVisit(newDartsUsed);
     }
     setCheckout(co);
