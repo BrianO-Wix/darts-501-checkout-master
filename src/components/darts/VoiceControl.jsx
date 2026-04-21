@@ -205,7 +205,7 @@ export function speakText(text) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "en-GB";
-  utterance.rate = 0.82;   // slower = more authoritative
+  utterance.rate = 1.1;   // slightly faster
   utterance.pitch = 0.7;   // lower = gruff
   utterance.volume = 1;
 
