@@ -1,14 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Volume2 } from "lucide-react";
+import { Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function VoiceControl({ onScoreDetected }) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [supported, setSupported] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
   const recognitionRef = useRef(null);
+  const onScoreRef = useRef(onScoreDetected);
+
+  // Keep ref in sync so the recognition handler always calls the latest version
+  useEffect(() => {
+    onScoreRef.current = onScoreDetected;
+  }, [onScoreDetected]);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -28,17 +34,24 @@ export default function VoiceControl({ onScoreDetected }) {
       setTranscript(text);
 
       if (current.isFinal) {
-        // Extract number from speech
+        // Try to parse spoken numbers like "one hundred and seventy" or digits "170"
         const numbers = text.match(/\d+/g);
         if (numbers) {
           const score = parseInt(numbers[numbers.length - 1], 10);
-          onScoreDetected(score);
+          onScoreRef.current(score);
         }
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
       setIsListening(false);
+      if (event.error === "not-allowed") {
+        setErrorMsg("Microphone access denied. Please allow microphone in your browser.");
+      } else if (event.error === "no-speech") {
+        setErrorMsg("No speech detected. Try again.");
+      } else {
+        setErrorMsg(`Error: ${event.error}`);
+      }
     };
 
     recognition.onend = () => {
@@ -50,18 +63,31 @@ export default function VoiceControl({ onScoreDetected }) {
     return () => {
       recognition.abort();
     };
-  }, [onScoreDetected]);
+  }, []); // Only run once — uses ref for callback
 
-  const toggleListening = useCallback(() => {
+  const toggleListening = useCallback(async () => {
     if (!recognitionRef.current) return;
+    setErrorMsg("");
 
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
     } else {
+      // Request microphone permission explicitly first
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        setErrorMsg("Microphone access denied. Please allow microphone in your browser.");
+        return;
+      }
+
       setTranscript("");
-      recognitionRef.current.start();
-      setIsListening(true);
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (err) {
+        setErrorMsg("Could not start voice recognition. Try again.");
+      }
     }
   }, [isListening]);
 
@@ -130,6 +156,20 @@ export default function VoiceControl({ onScoreDetected }) {
       <p className="text-sm font-body text-muted-foreground tracking-wide uppercase">
         {isListening ? "Listening…" : "Tap to speak"}
       </p>
+
+      {/* Error message */}
+      <AnimatePresence>
+        {errorMsg && (
+          <motion.p
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="text-destructive font-body text-sm text-center max-w-xs"
+          >
+            {errorMsg}
+          </motion.p>
+        )}
+      </AnimatePresence>
 
       {/* Transcript */}
       <AnimatePresence>
