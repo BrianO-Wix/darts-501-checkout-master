@@ -255,7 +255,7 @@ export default function Dashboard() {
                     )}
                   </div>
                 )}
-                <CheckoutDisplay checkout={checkout} score={remaining} />
+                <CheckoutDisplay checkout={checkout} score={remaining} finished={remaining === 0} />
               </div>
 
               {/* Log history */}

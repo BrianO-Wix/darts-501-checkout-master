@@ -1,10 +1,24 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Target, Volume2, AlertCircle } from "lucide-react";
+import { Target, Volume2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { speakCheckout } from "./VoiceControl";
 
-export default function CheckoutDisplay({ checkout, score }) {
+export default function CheckoutDisplay({ checkout, score, finished }) {
+  if (finished) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="text-center py-12"
+      >
+        <CheckCircle2 className="w-20 h-20 mx-auto text-primary mb-4" />
+        <p className="text-primary font-display text-4xl tracking-wide">Game of Darts</p>
+        <p className="text-primary font-display text-3xl tracking-wide mt-1">Well Done!</p>
+      </motion.div>
+    );
+  }
+
   if (score === null) {
     return (
       <div className="text-center py-12">
