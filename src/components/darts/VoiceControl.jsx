@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
 import { Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function VoiceControl({ onTranscript, prompt }) {
+const VoiceControl = forwardRef(function VoiceControl({ onTranscript, prompt }, ref) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [supported, setSupported] = useState(true);
@@ -82,6 +82,20 @@ export default function VoiceControl({ onTranscript, prompt }) {
     }
   }, []);
 
+  useImperativeHandle(ref, () => ({ toggle: toggleListening }), [toggleListening]);
+
+  // Register MediaSession so AirPods play/pause tap toggles the mic
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    navigator.mediaSession.metadata = new MediaMetadata({ title: "Darts Checkout Pro", artist: "Mic control" });
+    navigator.mediaSession.setActionHandler("play", () => toggleListening());
+    navigator.mediaSession.setActionHandler("pause", () => toggleListening());
+    return () => {
+      navigator.mediaSession.setActionHandler("play", null);
+      navigator.mediaSession.setActionHandler("pause", null);
+    };
+  }, [toggleListening]);
+
   if (!supported) {
     return (
       <div className="text-center text-muted-foreground font-body text-sm">
@@ -150,6 +164,9 @@ export default function VoiceControl({ onTranscript, prompt }) {
       {prompt && (
         <p className="text-xs font-body text-muted-foreground/70 text-center max-w-xs">{prompt}</p>
       )}
+      <p className="text-xs font-body text-muted-foreground/40 text-center">
+        AirPods tap · Space key · or tap mic
+      </p>
 
       {/* Error message */}
       <AnimatePresence>
@@ -181,7 +198,9 @@ export default function VoiceControl({ onTranscript, prompt }) {
       </AnimatePresence>
     </div>
   );
-}
+});
+
+export default VoiceControl;
 
 function getBritishMaleVoice() {
   const voices = window.speechSynthesis.getVoices();

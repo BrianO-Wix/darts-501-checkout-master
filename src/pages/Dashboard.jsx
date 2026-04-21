@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Target, List, Undo2 } from "lucide-react";
@@ -20,6 +20,19 @@ export default function Dashboard() {
   const [manualInput, setManualInput] = useState("");
   const logIdRef = useRef(0);
   const lastTranscriptRef = useRef("");
+  const voiceRef = useRef(null);
+
+  // Space key = toggle mic (hands-free fallback for keyboard users)
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.code === "Space" && e.target === document.body) {
+        e.preventDefault();
+        voiceRef.current?.toggle();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const nextId = () => ++logIdRef.current;
 
@@ -235,6 +248,7 @@ export default function Dashboard() {
               {/* Voice mic */}
               <div className="bg-card rounded-2xl border border-border p-8">
                 <VoiceControl
+                  ref={voiceRef}
                   onTranscript={handleVoiceInput}
                   prompt={gameActive ? `Say a dart (e.g. "triple 20") or new score` : `Say your remaining score`}
                 />
